@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Delivery Time Predictor Analytics</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="page-shell analytics-shell">
+    <section class="hero analytics-hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Model Analytics</p>
+        <h1>Training insights</h1>
+        <p class="subtitle">
+          Explore the saved regression line, the raw CSV points, and the gradient descent loss curve.
+        </p>
+        <div class="status-row">
+          <span class="status-dot {{ 'ready' if model_ready else 'not-ready' }}"></span>
+          <span>{{ 'Model loaded and ready' if model_ready else 'Model not loaded' }}</span>
+        </div>
+      </div>
+
+      <div class="glass-card analytics-summary">
+        <div>
+          <span class="stat-label">Slope</span>
+          <strong id="slopeValue">-</strong>
+        </div>
+        <div>
+          <span class="stat-label">Intercept</span>
+          <strong id="interceptValue">-</strong>
+        </div>
+        <div>
+          <span class="stat-label">Final MSE</span>
+          <strong id="mseValue">-</strong>
+        </div>
+        <div>
+          <span class="stat-label">Samples</span>
+          <strong id="sampleCountValue">-</strong>
+        </div>
+        <a class="analytics-link secondary" href="/">Back to predictor</a>
+      </div>
+    </section>
+
+    <section class="content-grid analytics-grid">
+      <article class="glass-card chart-card">
+        <div class="card-head">
+          <h2>Model fit</h2>
+          <span>Data points and fitted line</span>
+        </div>
+        <canvas id="fitChart"></canvas>
+      </article>
+
+      <article class="glass-card chart-card">
+        <div class="card-head">
+          <h2>Loss curve</h2>
+          <span>Gradient descent checkpoints</span>
+        </div>
+        <canvas id="lossChart"></canvas>
+      </article>
+    </section>
+  </div>
+
+  <script>
+    const slopeValue = document.getElementById('slopeValue');
+    const interceptValue = document.getElementById('interceptValue');
+    const mseValue = document.getElementById('mseValue');
+    const sampleCountValue = document.getElementById('sampleCountValue');
+
+    function buildFittedLine(points, m, b) {
+      const distances = points.map((point) => point.distance_km);
+      const minDistance = Math.min(...distances);
+      const maxDistance = Math.max(...distances);
+      return [
+        { x: minDistance, y: m * minDistance + b },
+        { x: maxDistance, y: m * maxDistance + b }
+      ];
+    }
+
+    async function loadAnalytics() {
+      const response = await fetch('/api/analytics');
+      const payload = await response.json();
+
+      slopeValue.textContent = Number(payload.m).toFixed(4);
+      interceptValue.textContent = Number(payload.b).toFixed(4);
+      mseValue.textContent = Number(payload.final_mse).toFixed(4);
+      sampleCountValue.textContent = String(payload.sample_count);
+
+      const scatterPoints = payload.data_points.map((point) => ({
+        x: point.distance_km,
+        y: point.delivery_time_min,
+      }));
+
+      const fittedLine = buildFittedLine(payload.data_points, payload.m, payload.b);
+      const history = payload.training_history || [];
+
+      new Chart(document.getElementById('fitChart'), {
+        type: 'scatter',
+        data: {
+          datasets: [
+            {
+              label: 'CSV data',
+              data: scatterPoints,
+              backgroundColor: '#0f766e',
+              borderColor: '#0f766e',
+            },
+            {
+              label: 'Fitted line',
+              data: fittedLine,
+              type: 'line',
+              borderColor: '#ea580c',
+              backgroundColor: '#ea580c',
+              tension: 0,
+              pointRadius: 0,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              labels: { color: '#1f2937' },
+            },
+          },
+          scales: {
+            x: {
+              title: { display: true, text: 'Distance (km)', color: '#4b5563' },
+              ticks: { color: '#4b5563' },
+              grid: { color: 'rgba(55, 65, 81, 0.14)' },
+            },
+            y: {
+              title: { display: true, text: 'Delivery time (min)', color: '#4b5563' },
+              ticks: { color: '#4b5563' },
+              grid: { color: 'rgba(55, 65, 81, 0.14)' },
+            },
+          },
+        },
+      });
+
+      new Chart(document.getElementById('lossChart'), {
+        type: 'line',
+        data: {
+          labels: history.map((item) => `E${item.epoch}`),
+          datasets: [{
+            label: 'Loss',
+            data: history.map((item) => item.loss),
+            borderColor: '#2563eb',
+            backgroundColor: 'rgba(37, 99, 235, 0.2)',
+            tension: 0.3,
+            fill: true,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              labels: { color: '#1f2937' },
+            },
+          },
+          scales: {
+            x: {
+              ticks: { color: '#4b5563' },
+              grid: { color: 'rgba(55, 65, 81, 0.14)' },
+            },
+            y: {
+              ticks: { color: '#4b5563' },
+              grid: { color: 'rgba(55, 65, 81, 0.14)' },
+            },
+          },
+        },
+      });
+    }
+
+    loadAnalytics().catch((error) => {
+      slopeValue.textContent = 'Unavailable';
+      interceptValue.textContent = 'Unavailable';
+      mseValue.textContent = 'Unavailable';
+      sampleCountValue.textContent = 'Unavailable';
+      console.error(error);
+    });
+  </script>
+</body>
+</html>
