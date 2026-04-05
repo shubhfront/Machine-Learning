@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Delivery Time Predictor</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="page-shell">
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Linear Regression from Scratch</p>
+        <h1>Delivery Time Predictor</h1>
+        <p class="subtitle">
+          Enter a distance in kilometers and get a delivery time estimate from the trained model.
+        </p>
+        <div class="status-row">
+          <span class="status-dot {{ 'ready' if model_ready else 'not-ready' }}"></span>
+          <span>{{ 'Model loaded and ready' if model_ready else 'Model not loaded' }}</span>
+        </div>
+        <a class="analytics-link" href="/analytics">Open analytics page</a>
+      </div>
+
+      <div class="glass-card predictor-card">
+        <label for="distance">Distance in kilometers</label>
+        <div class="input-row">
+          <input id="distance" type="number" min="0.1" step="0.1" value="7.5" placeholder="e.g. 7.5">
+          <button id="predictBtn" type="button">Predict</button>
+        </div>
+        <p class="helper-text">Type a distance and get the predicted delivery time below.</p>
+
+        <div class="result-panel" id="resultPanel">
+          <span class="result-label">Predicted delivery time</span>
+          <strong id="predictionValue">-</strong>
+          <span id="distanceValue">Distance: -</span>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const predictBtn = document.getElementById('predictBtn');
+    const distanceInput = document.getElementById('distance');
+    const predictionValue = document.getElementById('predictionValue');
+    const distanceValue = document.getElementById('distanceValue');
+
+    async function predictDeliveryTime() {
+      const distance = Number(distanceInput.value);
+
+      if (!distance || distance <= 0) {
+        predictionValue.textContent = '-';
+        distanceValue.textContent = 'Distance: enter a value greater than 0';
+        return;
+      }
+
+      predictBtn.disabled = true;
+      predictBtn.textContent = 'Predicting...';
+
+      try {
+        const response = await fetch('/api/predict', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ distance_km: distance })
+        });
+
+        const payload = await response.json();
+
+        if (!response.ok) {
+          throw new Error(payload.detail || 'Prediction failed');
+        }
+
+        predictionValue.textContent = `${payload.predicted_delivery_time_min} min`;
+        distanceValue.textContent = `Distance: ${payload.distance_km} km`;
+      } catch (error) {
+        distanceValue.textContent = error.message;
+        predictionValue.textContent = '-';
+      } finally {
+        predictBtn.disabled = false;
+        predictBtn.textContent = 'Predict';
+      }
+    }
+
+    predictBtn.addEventListener('click', predictDeliveryTime);
+    distanceInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        predictDeliveryTime();
+      }
+    });
+  </script>
+</body>
+</html>
