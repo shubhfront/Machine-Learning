@@ -1,49 +1,95 @@
-from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score
-import csv
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.use("Qt5Agg")
 
-with open("logistic/loan.csv") as f:
-    read = csv.reader(f)
-    data = list(read)
+X = np.array([1, 2, 3, 4, 5, 6, 7, 8], dtype=float)
+y = np.array([0, 0, 0, 0, 1, 1, 1, 1], dtype=float)
 
-x_set, y_set = [], []
+def sigmoid(z):
+    return 1 / (1 + np.exp(-z))
 
-for i in range(1, len(data)):
-    x_num = int(data[i][0])
-    x_set.append(x_num)
-    y_set.append(int(data[i][1]))
+def compute_cost(X, y, w, b):
+    m = len(y)
+    z = w * X + b
+    y_pred = sigmoid(z)
+    y_pred = np.clip(y_pred, 1e-10, 1 - 1e-10)
 
-X = np.array(x_set, dtype=float).reshape(-1, 1)
-y = np.array(y_set, dtype=float)
+    cost = -(1 / m) * np.sum(y * np.log(y_pred) + (1 - y) * np.log(1 - y_pred))
+    return cost
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+def train_logistic_regression(X, y, learning_rate=0.1, epochs=5000):
+    w = 0.0
+    b = 0.0
+    m = len(y)
+    cost_history = []
 
-model = LogisticRegression()
+    for epoch in range(epochs):
+        z = w * X + b
+        y_pred = sigmoid(z)
 
-model.fit(X_train, y_train)
+        dw = (1 / m) * np.sum((y_pred - y) * X)
+        db = (1 / m) * np.sum(y_pred - y)
 
-y_pred = model.predict(X_test)
+        w = w - learning_rate * dw
+        b = b - learning_rate * db
 
-accuracy = accuracy_score(y_test, y_pred)
-print("accuracy: ", accuracy)
+        cost = compute_cost(X, y, w, b)
+        cost_history.append(cost)
 
-new_data = [[430]]
-prediction = model.predict(new_data)
-print("Prediction:", prediction)
+        if epoch % 500 == 0:
+            print(f"Epoch {epoch}, Cost: {cost:.6f}")
 
-plt.scatter(X, y, color="blue", label="Data points")
-x_curve = np.linspace(min(X), max(X), 100).reshape(-1, 1)
-y_prob = model.predict_proba(x_curve)[:, 1]
+    return w, b, cost_history
 
-plt.plot(x_curve, y_prob, color="blue", label="sigmoid curve")
+def predict_probability(X, w, b):
+    z = w * X + b
+    return sigmoid(z)
 
-plt.xlabel("Credit Score")
-plt.ylabel("Loan Approval")
+def predict_class(X, w, b, threshold=0.5):
+    probs = predict_probability(X, w, b)
+    return (probs >= threshold).astype(int)
+
+w, b, cost_history = train_logistic_regression(X, y)
+
+print("\nFinal weight:", w)
+print("Final bias:", b)
+
+probs = predict_probability(X, w, b)
+preds = predict_class(X, w, b)
+
+print("\nPredicted probabilities:")
+print(probs)
+
+print("\nPredicted classes:")
+print(preds)
+
+accuracy = np.mean(preds == y) * 100
+print(f"\nAccuracy: {accuracy:.2f}%")
+
+new_x = 4.5
+new_prob = predict_probability(np.array([new_x]), w, b)[0]
+new_class = predict_class(np.array([new_x]), w, b)[0]
+
+print(f"\nFor X = {new_x}")
+print(f"Probability = {new_prob:.4f}")
+print(f"Predicted class = {new_class}")
+
+x_range = np.linspace(min(X) - 1, max(X) + 1, 200)
+y_curve = predict_probability(x_range, w, b)
+
+plt.scatter(X, y, label="Actual Data")
+plt.plot(x_range, y_curve, label="Logistic Regression Curve")
+plt.xlabel("X")
+plt.ylabel("Probability / Class")
+plt.title("Logistic Regression (One X and One Y)")
 plt.legend()
-plt.title("Logistic Regression Visualisation")
+plt.grid(True)
+plt.show()
+
+plt.plot(cost_history)
+plt.xlabel("Epochs")
+plt.ylabel("Cost")
+plt.title("Cost Reduction Over Time")
+plt.grid(True)
 plt.show()
