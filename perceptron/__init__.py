@@ -1,1 +1,0 @@
-"""Perceptron digit classifier app."""
